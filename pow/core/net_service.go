@@ -2,7 +2,6 @@ package core
 
 import (
 	"encoding/json"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/mux"
 	"io"
 	"log"
@@ -57,7 +56,6 @@ func handleWriteBlock(w http.ResponseWriter, r *http.Request) {
 	Mutex.Unlock()
 	if isBlockValid(new, blockChain[len(blockChain)-1]) {
 		blockChain = append(blockChain, new)
-		spew.Dump(blockChain)
 	}
 	respondWithJSON(w, r, http.StatusCreated, new)
 
