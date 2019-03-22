@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-crypto"
 	"github.com/libp2p/go-libp2p-host"
@@ -26,7 +25,6 @@ import (
 	"github.com/libp2p/go-libp2p-peer"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
 	ma "github.com/multiformats/go-multiaddr"
-	gologging "github.com/whyrusleeping/go-logging"
 )
 
 type Block struct {
@@ -42,20 +40,17 @@ var (
 	mutex      = &sync.Mutex{}
 )
 
-func makeBasicHost(listenPort int, secio bool, randseed int64) (host.Host, error) {
+// 创建一个节点
+func makeBasicHost(listenPort int, secio bool, randSeed int64) (host.Host, error) {
 
-	// If the seed is zero, use real cryptographic randomness. Otherwise, use a
-	// deterministic randomness source to make generated keys stay the same
-	// across multiple runs
 	var r io.Reader
-	if randseed == 0 {
+	if randSeed == 0 {
 		r = rand.Reader
 	} else {
-		r = mrand.New(mrand.NewSource(randseed))
+		r = mrand.New(mrand.NewSource(randSeed))
 	}
 
-	// Generate a key pair for this host. We will use it
-	// to obtain a valid host ID.
+	// 生成一个秘钥对进行创建一个节点
 	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, r)
 	if err != nil {
 		return nil, err
@@ -71,14 +66,11 @@ func makeBasicHost(listenPort int, secio bool, randseed int64) (host.Host, error
 		return nil, err
 	}
 
-	// Build host multiaddress
+	// 绑定多地址
 	hostAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", basicHost.ID().Pretty()))
 
-	// Now we can build a full multiaddress to reach this host
-	// by encapsulating both addresses:
 	addrs := basicHost.Addrs()
 	var addr ma.Multiaddr
-	// select the address starting with "ip4"
 	for _, i := range addrs {
 		if strings.HasPrefix(i.String(), "/ip4") {
 			addr = i
@@ -88,9 +80,9 @@ func makeBasicHost(listenPort int, secio bool, randseed int64) (host.Host, error
 	fullAddr := addr.Encapsulate(hostAddr)
 	log.Printf("I am %s\n", fullAddr)
 	if secio {
-		log.Printf("Now run \"go run main.go -l %d -d %s -secio\" on a different terminal\n", listenPort+1, fullAddr)
+		log.Printf("go run main.go -l %d -d %s -secio ", listenPort+1, fullAddr)
 	} else {
-		log.Printf("Now run \"go run main.go -l %d -d %s\" on a different terminal\n", listenPort+1, fullAddr)
+		log.Printf("go run main.go -l %d -d %s", listenPort+1, fullAddr)
 	}
 
 	return basicHost, nil
@@ -100,13 +92,11 @@ func handleStream(s net.Stream) {
 
 	log.Println("Got a new stream!")
 
-	// Create a buffer stream for non blocking read and write.
 	rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
 
 	go readData(rw)
 	go writeData(rw)
 
-	// stream 's' will stay open until you close it (or the other side closes it).
 }
 
 func readData(rw *bufio.ReadWriter) {
@@ -204,22 +194,16 @@ func main() {
 
 	BlockChain = append(BlockChain, genesisBlock)
 
-	// LibP2P code uses golog to log messages. They log with different
-	// string IDs (i.e. "swarm"). We can control the verbosity level for
-	// all loggers with:
-	golog.SetAllLoggers(gologging.INFO) // Change to DEBUG for extra info
-
-	// Parse options from the command line
 	listenF := flag.Int("l", 0, "wait for incoming connections")
 	target := flag.String("d", "", "target peer to dial")
 	secio := flag.Bool("secio", false, "enable secio")
 	seed := flag.Int64("seed", 0, "set random seed for id generation")
 	flag.Parse()
+
 	if *listenF == 0 {
 		log.Fatal("Please provide a port to bind on with -l")
 	}
 
-	// Make a host that listens on the given multiaddress
 	ha, err := makeBasicHost(*listenF, *secio, *seed)
 	if err != nil {
 		log.Fatal(err)
@@ -227,17 +211,11 @@ func main() {
 
 	if *target == "" {
 		log.Println("listening for connections")
-		// Set a stream handler on host A. /p2p/1.0.0 is
-		// a user-defined protocol name.
 		ha.SetStreamHandler("/p2p/1.0.0", handleStream)
 
-		select {} // hang forever
-		/**** This is where the listener code ends ****/
+		select {}
 	} else {
 		ha.SetStreamHandler("/p2p/1.0.0", handleStream)
-
-		// The following code extracts target's peer ID from the
-		// given multiaddress
 		ipfsaddr, err := ma.NewMultiaddr(*target)
 		if err != nil {
 			log.Fatalln(err)
@@ -248,33 +226,26 @@ func main() {
 			log.Fatalln(err)
 		}
 
-		peerid, err := peer.IDB58Decode(pid)
+		peerId, err := peer.IDB58Decode(pid)
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		// Decapsulate the /ipfs/<peerID> part from the target
-		// /ip4/<a.b.c.d>/ipfs/<peer> becomes /ip4/<a.b.c.d>
 		targetPeerAddr, _ := ma.NewMultiaddr(
-			fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
+			fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerId)))
 		targetAddr := ipfsaddr.Decapsulate(targetPeerAddr)
 
-		// We have a peer ID and a targetAddr so we add it to the peerstore
-		// so LibP2P knows how to contact it
-		ha.Peerstore().AddAddr(peerid, targetAddr, pstore.PermanentAddrTTL)
+		ha.Peerstore().AddAddr(peerId, targetAddr, pstore.PermanentAddrTTL)
 
 		log.Println("opening stream")
-		// make a new stream from host B to host A
-		// it should be handled on host A by the handler we set above because
-		// we use the same /p2p/1.0.0 protocol
-		s, err := ha.NewStream(context.Background(), peerid, "/p2p/1.0.0")
+
+		// 保持链接
+		s, err := ha.NewStream(context.Background(), peerId, "/p2p/1.0.0")
 		if err != nil {
 			log.Fatalln(err)
 		}
-		// Create a buffered stream so that read and writes are non blocking.
 		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
 
-		// Create a thread to read and write data.
 		go writeData(rw)
 		go readData(rw)
 
@@ -283,7 +254,6 @@ func main() {
 	}
 }
 
-// make sure block is valid by checking index, and comparing the hash of the previous block
 func isBlockValid(newBlock, oldBlock Block) bool {
 	if oldBlock.Height+1 != newBlock.Height {
 		return false
@@ -300,7 +270,6 @@ func isBlockValid(newBlock, oldBlock Block) bool {
 	return true
 }
 
-// SHA256 hashing
 func calculateHash(block Block) string {
 	record := fmt.Sprintf("%d%d%s%s", block.Height, block.Timestamp, block.Value, block.PrevHash)
 	h := sha256.New()
@@ -309,9 +278,7 @@ func calculateHash(block Block) string {
 	return hex.EncodeToString(hashed)
 }
 
-// create a new block using previous block's hash
 func generateBlock(oldBlock Block, value string) Block {
-
 	var newBlock Block
 
 	newBlock.Height = oldBlock.Height + 1
