@@ -13,38 +13,35 @@ import (
 	"log"
 	mrand "math/rand"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	golog "github.com/ipfs/go-log"
-	libp2p "github.com/libp2p/go-libp2p"
-	crypto "github.com/libp2p/go-libp2p-crypto"
-	host "github.com/libp2p/go-libp2p-host"
-	net "github.com/libp2p/go-libp2p-net"
-	peer "github.com/libp2p/go-libp2p-peer"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-crypto"
+	"github.com/libp2p/go-libp2p-host"
+	"github.com/libp2p/go-libp2p-net"
+	"github.com/libp2p/go-libp2p-peer"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
 	ma "github.com/multiformats/go-multiaddr"
 	gologging "github.com/whyrusleeping/go-logging"
 )
 
 type Block struct {
-	Index     int
-	Timestamp string
+	Height    int
+	Timestamp int64
 	Value     string
 	Hash      string
 	PrevHash  string
 }
 
-// Blockchain is a series of validated Blocks
-var BlockChain []Block
+var (
+	BlockChain []Block
+	mutex      = &sync.Mutex{}
+)
 
-var mutex = &sync.Mutex{}
-
-// makeBasicHost creates a LibP2P host with a random peer ID listening on the
-// given multiaddress. It will use secio if secio is true.
 func makeBasicHost(listenPort int, secio bool, randseed int64) (host.Host, error) {
 
 	// If the seed is zero, use real cryptographic randomness. Otherwise, use a
@@ -202,9 +199,8 @@ func writeData(rw *bufio.ReadWriter) {
 }
 
 func main() {
-	t := time.Now()
 	genesisBlock := Block{}
-	genesisBlock = Block{0, t.String(), "first block", calculateHash(genesisBlock), ""}
+	genesisBlock = Block{0, time.Now().Unix(), "first block", calculateHash(genesisBlock), ""}
 
 	BlockChain = append(BlockChain, genesisBlock)
 
@@ -289,7 +285,7 @@ func main() {
 
 // make sure block is valid by checking index, and comparing the hash of the previous block
 func isBlockValid(newBlock, oldBlock Block) bool {
-	if oldBlock.Index+1 != newBlock.Index {
+	if oldBlock.Height+1 != newBlock.Height {
 		return false
 	}
 
@@ -306,7 +302,7 @@ func isBlockValid(newBlock, oldBlock Block) bool {
 
 // SHA256 hashing
 func calculateHash(block Block) string {
-	record := strconv.Itoa(block.Index) + block.Timestamp + block.Value + block.PrevHash
+	record := fmt.Sprintf("%d%d%s%s", block.Height, block.Timestamp, block.Value, block.PrevHash)
 	h := sha256.New()
 	h.Write([]byte(record))
 	hashed := h.Sum(nil)
@@ -318,10 +314,8 @@ func generateBlock(oldBlock Block, value string) Block {
 
 	var newBlock Block
 
-	t := time.Now()
-
-	newBlock.Index = oldBlock.Index + 1
-	newBlock.Timestamp = t.String()
+	newBlock.Height = oldBlock.Height + 1
+	newBlock.Timestamp = time.Now().Unix()
 	newBlock.Value = value
 	newBlock.PrevHash = oldBlock.Hash
 	newBlock.Hash = calculateHash(newBlock)

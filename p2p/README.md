@@ -7,5 +7,9 @@
 * 所有终端会同步链上数据
 * Value 为终端输入信息
 
+#### TODO
+* 更多终端链接测试
+* 终端退出不影响其他运行
+
 #### 参考
 [https://github.com/mycoralhealth/blockchain-tutorial/blob/master/p2p](https://github.com/mycoralhealth/blockchain-tutorial/tree/master/p2p)
