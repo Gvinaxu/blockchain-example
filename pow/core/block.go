@@ -10,7 +10,7 @@ func init() {
 type Block struct {
 	Height     int64  `json:"height"`
 	Timestamp  int64  `json:"timestamp"`
-	Difficulty int64  `json:"difficulty"`
+	Difficulty float64  `json:"difficulty"`
 	Value      string `json:"value"`
 	Hash       string `json:"hash"`
 	PreHash    string `json:"pre_hash"`

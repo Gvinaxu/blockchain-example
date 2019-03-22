@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	difficulty = int64(1)
+	difficulty = 0.001
 )
 
 func GenerateBlock(old Block, value string) Block {
@@ -27,7 +27,7 @@ func GenerateBlock(old Block, value string) Block {
 		if !isHashValid(newHash, int(difficulty)) {
 			time.Sleep(time.Millisecond)
 		} else {
-			difficulty += 2
+			difficulty *= 1.00000001
 			new.Hash = newHash
 			break
 		}
