@@ -8,8 +8,8 @@ import (
 	"time"
 )
 
-const (
-	difficulty = 1
+var (
+	difficulty = int64(1)
 )
 
 func GenerateBlock(old Block, value string) Block {
@@ -24,9 +24,10 @@ func GenerateBlock(old Block, value string) Block {
 		hex := fmt.Sprintf("%x", i)
 		new.Nonce = hex
 		newHash := calculateHash(new)
-		if !isHashValid(newHash, difficulty) {
+		if !isHashValid(newHash, int(difficulty)) {
 			time.Sleep(time.Millisecond)
 		} else {
+			difficulty += 2
 			new.Hash = newHash
 			break
 		}
