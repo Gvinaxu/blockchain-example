@@ -1,0 +1,19 @@
+version: "2"
+services:
+  peer0:
+    build: ./
+    ports:
+      - "9000:9090"
+  peer1:
+    image: simpleblockchain_peer0
+    ports:
+      - "9001:9090"
+    links:
+      - peer0
+  peer2:
+    image: simpleblockchain_peer0
+    ports:
+      - "9002:9090"
+    links:
+      - peer0
+      - peer1
